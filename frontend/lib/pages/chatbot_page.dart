@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import '../globals.dart';
+import '../generated/l10n.dart'; // Import localization
 
 class ChatbotPage extends StatefulWidget {
   const ChatbotPage({super.key});
@@ -23,12 +26,32 @@ class _ChatbotPageState extends State<ChatbotPage> {
       _controller.clear();
     });
 
-    // Replace this with your actual backend call
-    await Future.delayed(const Duration(seconds: 1));
-    setState(() {
-      _messages.add({'sender': 'bot', 'message': '[$lang] Bot reply for: $userInput'});
-      _loading = false;
-    });
+    final response = await http.post(
+      Uri.parse('http://localhost:8000/crop-rotation'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'lang': lang,
+        'user_paragraph': userInput,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      final botMessage = data['crop_rotation_advice'];
+
+      setState(() {
+        _messages.add({'sender': 'bot', 'message': botMessage});
+        _loading = false;
+      });
+    } else {
+      setState(() {
+        _messages.add({
+          'sender': 'bot',
+          'message': S.of(context)!.errorMessage, // localized error message
+        });
+        _loading = false;
+      });
+    }
   }
 
   @override
@@ -37,7 +60,7 @@ class _ChatbotPageState extends State<ChatbotPage> {
       valueListenable: appLanguage,
       builder: (context, lang, _) {
         return Scaffold(
-          appBar: AppBar(title: const Text('Chatbot')),
+          appBar: AppBar(title: Text(S.of(context)!.chatbotTitle)),
           body: Column(
             children: [
               Expanded(
@@ -49,6 +72,7 @@ class _ChatbotPageState extends State<ChatbotPage> {
                     return Align(
                       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
                       child: Container(
+                        constraints: const BoxConstraints(maxWidth: 320),
                         margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
@@ -75,14 +99,14 @@ class _ChatbotPageState extends State<ChatbotPage> {
                     Expanded(
                       child: TextField(
                         controller: _controller,
-                        decoration: const InputDecoration(labelText: 'Enter your query'),
+                        decoration: InputDecoration(labelText: S.of(context)!.inputHint),
                         onSubmitted: (_) => sendMessage(lang),
                       ),
                     ),
                     const SizedBox(width: 8),
                     ElevatedButton(
                       onPressed: _loading ? null : () => sendMessage(lang),
-                      child: const Text('Send'),
+                      child: Text(S.of(context)!.send),
                     ),
                   ],
                 ),

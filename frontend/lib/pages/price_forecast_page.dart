@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../globals.dart';
+import '../generated/l10n.dart';
 
 class PriceForecastPage extends StatefulWidget {
   const PriceForecastPage({super.key});
@@ -12,19 +13,12 @@ class PriceForecastPage extends StatefulWidget {
 
 class _PriceForecastPageState extends State<PriceForecastPage> {
   final _formKey = GlobalKey<FormState>();
-
-  List<String> _districts = [];
-  List<String> _commodities = [];
+  List<String> _districts = [], _commodities = [], _varieties = [];
   Map<String, List<String>> _varietiesByCommodity = {};
-  List<String> _varieties = [];
 
-  String? _selectedDistrict;
-  String? _selectedCommodity;
-  String? _selectedVariety;
+  String? _selectedDistrict, _selectedCommodity, _selectedVariety;
   DateTime? _selectedDate;
-
-  bool _loading = false;
-  bool _optionsLoading = true;
+  bool _loading = false, _optionsLoading = true;
   String? _error;
   double? _forecastPrice;
 
@@ -40,36 +34,22 @@ class _PriceForecastPageState extends State<PriceForecastPage> {
       _error = null;
     });
     try {
-      final uri = Uri.parse('http://localhost:8000/price-forecast-options'); // Adjust as needed
-      final response = await http.get(uri);
+      final response = await http.get(Uri.parse('http://localhost:8000/price-forecast-options'));
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         setState(() {
           _districts = List<String>.from(data['districts']);
           _commodities = List<String>.from(data['commodities']);
-          _varietiesByCommodity = Map<String, List<String>>.from(
-            (data['varieties_by_commodity'] as Map).map(
-              (k, v) => MapEntry(k, List<String>.from(v)),
-            ),
-          );
-          _selectedDistrict = null;
-          _selectedCommodity = null;
-          _selectedVariety = null;
-          _varieties = [];
+          _varietiesByCommodity = Map.from(data['varieties_by_commodity'])
+              .map((k, v) => MapEntry(k, List<String>.from(v)));
         });
       } else {
-        setState(() {
-          _error = "Failed to load options: ${response.statusCode}";
-        });
+        _error = "${S.of(context)!.loadOptionsFail} ${response.statusCode}";
       }
     } catch (e) {
-      setState(() {
-        _error = "Failed to connect to backend: $e";
-      });
+      _error = "${S.of(context)!.backendError} $e";
     } finally {
-      setState(() {
-        _optionsLoading = false;
-      });
+      setState(() => _optionsLoading = false);
     }
   }
 
@@ -81,9 +61,7 @@ class _PriceForecastPageState extends State<PriceForecastPage> {
       firstDate: now,
       lastDate: now.add(const Duration(days: 365)),
     );
-    if (picked != null) {
-      setState(() => _selectedDate = picked);
-    }
+    if (picked != null) setState(() => _selectedDate = picked);
   }
 
   Future<void> _fetchForecast(String lang) async {
@@ -94,9 +72,8 @@ class _PriceForecastPageState extends State<PriceForecastPage> {
     });
 
     try {
-      final uri = Uri.parse('http://localhost:8000/price-forecast'); // Adjust as needed
       final response = await http.post(
-        uri,
+        Uri.parse('http://localhost:8000/price-forecast'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'district': _selectedDistrict,
@@ -108,15 +85,15 @@ class _PriceForecastPageState extends State<PriceForecastPage> {
       if (response.statusCode == 200) {
         final price = double.tryParse(response.body);
         if (price != null && price >= 0) {
-          setState(() => _forecastPrice = price);
+          _forecastPrice = price;
         } else {
-          setState(() => _error = "No forecast available for the selected options.");
+          _error = S.of(context)!.noForecast;
         }
       } else {
-        setState(() => _error = "Server error: ${response.statusCode}");
+        _error = "${S.of(context)!.serverError} ${response.statusCode}";
       }
     } catch (e) {
-      setState(() => _error = "Failed to connect to backend: $e");
+      _error = "${S.of(context)!.backendError} $e";
     } finally {
       setState(() => _loading = false);
     }
@@ -128,7 +105,7 @@ class _PriceForecastPageState extends State<PriceForecastPage> {
       valueListenable: appLanguage,
       builder: (context, lang, _) {
         return Scaffold(
-          appBar: AppBar(title: const Text('Price Forecast')),
+          appBar: AppBar(title: Text(S.of(context)!.priceForecastTitle)),
           body: _optionsLoading
               ? const Center(child: CircularProgressIndicator())
               : Padding(
@@ -138,64 +115,54 @@ class _PriceForecastPageState extends State<PriceForecastPage> {
                     child: ListView(
                       children: [
                         DropdownButtonFormField<String>(
-                          decoration: const InputDecoration(
-                            labelText: 'Select District',
-                            border: OutlineInputBorder(),
+                          decoration: InputDecoration(
+                            labelText: S.of(context)!.selectDistrict,
+                            border: const OutlineInputBorder(),
                           ),
-                          items: _districts
-                              .map((d) => DropdownMenuItem(value: d, child: Text(d)))
-                              .toList(),
+                          items: _districts.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
                           value: _selectedDistrict,
-                          onChanged: (val) => setState(() {
-                            _selectedDistrict = val;
-                          }),
-                          validator: (val) => val == null ? 'Please select a district' : null,
+                          onChanged: (val) => setState(() => _selectedDistrict = val),
+                          validator: (val) => val == null ? S.of(context)!.districtRequired : null,
                         ),
                         const SizedBox(height: 16),
                         DropdownButtonFormField<String>(
-                          decoration: const InputDecoration(
-                            labelText: 'Select Commodity',
-                            border: OutlineInputBorder(),
+                          decoration: InputDecoration(
+                            labelText: S.of(context)!.selectCommodity,
+                            border: const OutlineInputBorder(),
                           ),
-                          items: _commodities
-                              .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                              .toList(),
+                          items: _commodities.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
                           value: _selectedCommodity,
                           onChanged: (val) {
                             setState(() {
                               _selectedCommodity = val;
                               _selectedVariety = null;
-                              _varieties = val != null
-                                  ? (_varietiesByCommodity[val] ?? [])
-                                  : [];
+                              _varieties = val != null ? (_varietiesByCommodity[val] ?? []) : [];
                             });
                           },
-                          validator: (val) => val == null ? 'Please select a commodity' : null,
+                          validator: (val) => val == null ? S.of(context)!.commodityRequired : null,
                         ),
                         const SizedBox(height: 16),
                         DropdownButtonFormField<String>(
-                          decoration: const InputDecoration(
-                            labelText: 'Select Variety',
-                            border: OutlineInputBorder(),
+                          decoration: InputDecoration(
+                            labelText: S.of(context)!.selectVariety,
+                            border: const OutlineInputBorder(),
                           ),
-                          items: _varieties
-                              .map((v) => DropdownMenuItem(value: v, child: Text(v)))
-                              .toList(),
+                          items: _varieties.map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
                           value: _selectedVariety,
                           onChanged: (val) => setState(() => _selectedVariety = val),
-                          validator: (val) => val == null ? 'Please select a variety' : null,
+                          validator: (val) => val == null ? S.of(context)!.varietyRequired : null,
                         ),
                         const SizedBox(height: 16),
                         InkWell(
                           onTap: () => _pickDate(context),
                           child: InputDecorator(
-                            decoration: const InputDecoration(
-                              labelText: 'Select Date',
-                              border: OutlineInputBorder(),
+                            decoration: InputDecoration(
+                              labelText: S.of(context)!.selectDate,
+                              border: const OutlineInputBorder(),
                             ),
                             child: Text(
                               _selectedDate == null
-                                  ? 'Tap to select date'
+                                  ? S.of(context)!.tapToSelectDate
                                   : _selectedDate!.toIso8601String().substring(0, 10),
                               style: TextStyle(
                                 color: _selectedDate == null ? Colors.grey : Colors.black,
@@ -205,10 +172,10 @@ class _PriceForecastPageState extends State<PriceForecastPage> {
                         ),
                         const SizedBox(height: 24),
                         ElevatedButton(
-                          onPressed: _loading
+                          onPressed: _loading || _selectedDate == null
                               ? null
                               : () {
-                                  if (_formKey.currentState!.validate() && _selectedDate != null) {
+                                  if (_formKey.currentState!.validate()) {
                                     _fetchForecast(lang);
                                   }
                                 },
@@ -218,7 +185,7 @@ class _PriceForecastPageState extends State<PriceForecastPage> {
                                   height: 24,
                                   child: CircularProgressIndicator(strokeWidth: 2),
                                 )
-                              : const Text('Get Forecast'),
+                              : Text(S.of(context)!.getForecast),
                         ),
                         const SizedBox(height: 24),
                         if (_error != null)
@@ -231,13 +198,12 @@ class _PriceForecastPageState extends State<PriceForecastPage> {
                               child: Column(
                                 children: [
                                   Text(
-                                    'Forecasted Price: ₹${_forecastPrice!.toStringAsFixed(2)}',
-                                    style: const TextStyle(
-                                        fontSize: 22, fontWeight: FontWeight.bold),
+                                    "${S.of(context)!.forecastedPrice}: ₹${_forecastPrice!.toStringAsFixed(2)}",
+                                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                                   ),
                                   const SizedBox(height: 8),
                                   Text(
-                                    'for $_selectedCommodity ($_selectedVariety) in $_selectedDistrict on ${_selectedDate!.toIso8601String().substring(0, 10)}',
+                                    "${S.of(context)!.forecastDetails(_selectedCommodity!, _selectedVariety!, _selectedDistrict!, _selectedDate!.toIso8601String().substring(0, 10))}",
                                     textAlign: TextAlign.center,
                                   ),
                                 ],

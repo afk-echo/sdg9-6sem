@@ -3,6 +3,7 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'dart:convert';
 import '../globals.dart';
+import '../generated/l10n.dart';
 
 class HelpArticlesPage extends StatefulWidget {
   const HelpArticlesPage({super.key});
@@ -51,7 +52,7 @@ class _HelpArticlesPageState extends State<HelpArticlesPage> {
     } catch (e) {
       setState(() {
         article = '';
-        errorMsg = 'No article found for $cropTitle in this language.';
+        errorMsg = S.of(context)!.articleMissing(cropTitle);
         isLoading = false;
       });
     }
@@ -89,7 +90,7 @@ class _HelpArticlesPageState extends State<HelpArticlesPage> {
                 : errorMsg != null
                     ? Center(child: Text(errorMsg!))
                     : article.isEmpty
-                        ? const Center(child: Text('No content available.'))
+                        ? Center(child: Text(S.of(context)!.noContent))
                         : Markdown(
                             data: article,
                             styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
@@ -101,16 +102,16 @@ class _HelpArticlesPageState extends State<HelpArticlesPage> {
 
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Crop Guides'),
+            title: Text(S.of(context)!.cropGuides),
           ),
           body: Column(
             children: [
               Padding(
                 padding: const EdgeInsets.all(12),
                 child: TextField(
-                  decoration: const InputDecoration(
-                    hintText: 'Search crops...',
-                    prefixIcon: Icon(Icons.search),
+                  decoration: InputDecoration(
+                    hintText: S.of(context)!.searchHint,
+                    prefixIcon: const Icon(Icons.search),
                   ),
                   onChanged: (val) => setState(() => searchQuery = val),
                 ),
@@ -118,7 +119,7 @@ class _HelpArticlesPageState extends State<HelpArticlesPage> {
               const Divider(height: 1),
               Expanded(
                 child: filteredCrops.isEmpty
-                    ? const Center(child: Text('No crops found'))
+                    ? Center(child: Text(S.of(context)!.noCropsFound))
                     : ListView.builder(
                         itemCount: filteredCrops.length,
                         itemBuilder: (context, idx) {
