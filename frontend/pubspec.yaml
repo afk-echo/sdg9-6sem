@@ -1,0 +1,25 @@
+name: farming_assistant
+description: A smart assistant for farmers.
+publish_to: 'none'
+version: 1.0.0
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.1
+  flutter_markdown: ^0.7.1
+  speech_to_text: ^6.6.0
+  material_color_utilities: ^0.11.1 
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/articles/
+    - assets/articles_manifest.json
