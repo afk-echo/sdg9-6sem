@@ -5,13 +5,24 @@ import pandas as pd
 import numpy as np
 from sklearn.ensemble import RandomForestRegressor
 import googletrans
+from fastapi.middleware.cors import CORSMiddleware
+
 translator = googletrans.Translator()
 
 async def translate_text(text: str, src: str, dest: str) -> str:
+    if src == dest:
+        return text
     result = await translator.translate(text, src=src, dest=dest)
     return result.text
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # --- Load your dataset once at startup ---
 df = pd.read_csv('Commodity Dataset2.csv')
@@ -55,6 +66,7 @@ def forecast_price(district, commodity, variety, forecast_date):
 # --- Schemas ---
 class CropRotationRequest(BaseModel):
     user_paragraph: str
+    lang: str = "en"  # "en" for English, "kn" for Kannada
 
 class PriceForecastRequest(BaseModel):
     district: str
@@ -62,12 +74,35 @@ class PriceForecastRequest(BaseModel):
     variety: str
     forecast_date: str
 
+# --- New endpoint for frontend dropdowns ---
+@app.get("/price-forecast-options")
+def price_forecast_options():
+    districts = sorted(df['District'].dropna().unique().tolist())
+    commodities = sorted(df['Commodity'].dropna().unique().tolist())
+    # For each commodity, get unique varieties
+    varieties_by_commodity = {}
+    for commodity in commodities:
+        varieties = df[df['Commodity'] == commodity]['Variety'].dropna().unique().tolist()
+        varieties_by_commodity[commodity] = sorted(varieties)
+    return {
+        "districts": districts,
+        "commodities": commodities,
+        "varieties_by_commodity": varieties_by_commodity
+    }
+
 # --- Endpoints ---
 
 @app.post("/crop-rotation")
 async def crop_rotation(request: CropRotationRequest):
-    english_input = await translate_text(request.user_paragraph, src="kn", dest="en")
-    print(english_input)
+    lang = request.lang.lower()
+    if lang not in ["en", "kn"]:
+        lang = "en"  # Default to English
+
+    if lang == "kn":
+        english_input = await translate_text(request.user_paragraph, src="kn", dest="en")
+    else:
+        english_input = request.user_paragraph
+
     ollama_cmd = [
         "ollama", "run", "crop-forecast"
     ]
@@ -76,11 +111,17 @@ async def crop_rotation(request: CropRotationRequest):
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        text=True
+        text=True,
+        encoding="utf-8"
     )
     llm_output, llm_err = process.communicate(input=english_input)
-    kannada_output = await translate_text(llm_output.strip(), src="en", dest="kn")
-    return {"crop_rotation_advice": kannada_output.strip()}
+
+    if lang == "kn":
+        response_text = await translate_text(llm_output.strip(), src="en", dest="kn")
+    else:
+        response_text = llm_output.strip()
+
+    return {"crop_rotation_advice": response_text}
 
 @app.post("/price-forecast", response_model=float)
 async def price_forecast(request: PriceForecastRequest):
