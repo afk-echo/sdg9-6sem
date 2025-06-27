@@ -4,6 +4,12 @@ import subprocess
 import pandas as pd
 import numpy as np
 from sklearn.ensemble import RandomForestRegressor
+import googletrans
+translator = googletrans.Translator()
+
+async def translate_text(text: str, src: str, dest: str) -> str:
+    result = await translator.translate(text, src=src, dest=dest)
+    return result.text
 
 app = FastAPI()
 
@@ -60,6 +66,8 @@ class PriceForecastRequest(BaseModel):
 
 @app.post("/crop-rotation")
 async def crop_rotation(request: CropRotationRequest):
+    english_input = await translate_text(request.user_paragraph, src="kn", dest="en")
+    print(english_input)
     ollama_cmd = [
         "ollama", "run", "crop-forecast"
     ]
@@ -70,8 +78,9 @@ async def crop_rotation(request: CropRotationRequest):
         stderr=subprocess.PIPE,
         text=True
     )
-    llm_output, llm_err = process.communicate(input=request.user_paragraph)
-    return {"crop_rotation_advice": llm_output.strip()}
+    llm_output, llm_err = process.communicate(input=english_input)
+    kannada_output = await translate_text(llm_output.strip(), src="en", dest="kn")
+    return {"crop_rotation_advice": kannada_output.strip()}
 
 @app.post("/price-forecast", response_model=float)
 async def price_forecast(request: PriceForecastRequest):
